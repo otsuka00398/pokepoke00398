@@ -46,7 +46,7 @@ function App() { // App() ページの本体
       　header を使ってコンテンツをまとめる
       */}
       <header className="App-header">
-        <h1>今日のポケモン</h1>
+        <h2>今日のポケモン</h2>
         <p>画像をクリック！</p>
         <img
           src={pokeImages[currentIndex]} 
