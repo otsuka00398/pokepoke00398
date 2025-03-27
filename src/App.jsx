@@ -53,6 +53,7 @@ function App() { // App() ページの本体
           className="App-image" //css用に記述
           onClick={handleClick}
           style={{ cursor: "pointer" }}//画像の上にカーソルをおくと手のひらになる
+          alt={pokeNames[currentIndex]} // 画像に名前を追加
         />
         <p>{pokeNames[currentIndex]}</p> {/* ポケモンの名前 */}
       </header>
