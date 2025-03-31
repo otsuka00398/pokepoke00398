@@ -1,33 +1,41 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%;
+  height: auto; /* 高さを制限しない */
 }
 
 .App {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  width: 100vw;
+  height: 100%; /* 高さを100%に */
+  width: 100%;  /* 幅を100%に */
   text-align: center;
-  background-color: #fff0f0; /* 背景色を画面全体に適用 */
+  background-color: #fff0f0;
+  color: rgb(90, 87, 87);
+  line-height: 1.2;
 }
 
 .App-header {
-  min-height: 100vh;
-  width: 100vw;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(5px + 2vmin);
-  color: rgb(90, 87, 87);
+  font-size: calc(10px + 2vmin); /* 画面のサイズに合わせてフォントサイズを調整 */
   font-family: 'Meiryo';
+  flex-grow: 1; /* コンテンツが画面いっぱいに広がるように */
+  line-height: 1.2; /* ヘッダー内の行間も狭く設定 */
 }
 
 .App-image {
-  max-width: 20%;
-  height: auto;
+  max-width: 100%;  /* 横幅100%に設定 */
+  height: auto;     /* 高さは自動で調整 */
+  object-fit: contain; /* 画像が枠に収まるように調整 */
+  height: 200px;    /* 高さを固定 */
   cursor: pointer;
 }
+
+
+
+
