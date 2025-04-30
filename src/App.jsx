@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Authenticator,
-  Button,
   Text,
   TextField,
   Heading,
@@ -24,6 +23,10 @@ import { generateClient } from "aws-amplify/data";
 import outputs from "../amplify_outputs.json";
 import './App.css';
 
+import Button from '@mui/material/Button';
+import DeleteIcon from '@mui/icons-material/Delete';
+import Stack from '@mui/material/Stack';
+
 Amplify.configure(outputs);
 // client.models.Note.〇〇　でデータを扱えるようにする
 const client = generateClient({ authMode: "userPool" });
@@ -31,23 +34,27 @@ const client = generateClient({ authMode: "userPool" });
 // Reactのメインコンポーネント
 export default function App() {
 
-  //const pokeImages = [usokki0185, mahoippu0869, ponita0077];// 画像リスト
-  const pokeImages = ["/usokki0185.svg","/mahoippu0869.svg","/ponita0077.svg"];
+  const pokeImages = ["/ウソッキー.png", "/マホイップ.png", "/ポニータ.png"];
   const pokeNames = ['ウソッキー', 'マホイップ', 'ポニータ'];// 名前リスト
   const pokeTypes = ['いわ', 'フェアリー', 'ほのお'];// 名前リスト
   const [notes, setNotes] = useState([]);// 登録したポケモン情報を管理する配列
 
-  // currentIndex＝現在〇番目、setCurrentIndex＝更新するメソッド、useState(0)＝初期値（0）
   const [currentIndex, setCurrentIndex] = useState(0);//現在表示されているポケモン画像のインデックス
   const [isShuffling, setIsShuffling] = useState(true);// シャッフルの ON/OFF を管理する状態
   const shuffleIntervalRef = useRef(null);// setInterval を管理するための参照 (useRef)
 
+  // 入力フォームの状態管理
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const fileInputRef = useRef(null);
 
-  /////useEffect、fetchNotes//////////////////////////////////////////////////////////////////////////////////
+  /////フック（useEffect、fetchNotes）//////////////////////////////////////////////////////////////////////////////////
+
+  fetchNotes();// 登録したポケモンの初回データ取得
 
   // データ取得＆シャッフル
   useEffect(() => {
-    fetchNotes();// 登録したポケモンの初回データ取得
     if (!isShuffling) return;// シャッフル停止中なら何もしない
 
     shuffleIntervalRef.current = setInterval(() => {
@@ -70,7 +77,8 @@ export default function App() {
             //path には S3の保存パスを指定
             path: ({ identityId }) => `media/${identityId}/${note.image}`,
           });
-          note.image = linkToStorageFile.url;
+          note.image = linkToStorageFile.url.toString();  // URLオブジェクトを文字列に変換
+          console.log("Retrieved image URL:", note.image);
         }
         return note;
       })
@@ -88,24 +96,30 @@ export default function App() {
   // ポケモンの登録　⇒登録データはAmazon DynamoDBに保存
   async function createNote(event) {
     event.preventDefault();// フォームの送信を防ぐ
-    const form = new FormData(event.target);
+
+    if (!imageFile) return; // ファイルが未選択なら中断
 
     // DynamoDB の Noteテーブルにデータ保存
-    // client.models.Note.list() で　DynamoDB から登録済みデータを取得
     const { data: newNote } = await client.models.Note.create({
-      name: form.get("name"),
-      description: form.get("description"),
-      image: form.get("image").name,
+      name,
+      description,
+      image: imageFile.name,
     });
 
     if (newNote.image) {// 画像がある場合は、 Amazon S3に保存
       await uploadData({
-        path: ({ identityId }) => `media/${identityId}/${newNote.image}`,//path には S3の保存パスを指定
-        data: form.get("image"),
+        path: ({ identityId }) => `media/${identityId}/${imageFile.name}`,//path には S3の保存パスを指定
+        data: imageFile,
       }).result;
     }
+
+    // フォームをクリア（名前・タイプ・画像）
+    setName("");
+    setDescription("");
+    setImageFile(null);
+    fileInputRef.current.value = null;
+
     fetchNotes();// 最新データを取得
-    event.target.reset();
   }
 
   // ポケモンを削除
@@ -115,36 +129,39 @@ export default function App() {
     fetchNotes();
   }
 
-    // おすすめポケモン登録
-    async function rcmPokemon({ index }) {
-      const pokeName = pokeNames[index];
-      const pokeImage = pokeImages[index];
-      const pokeType = pokeTypes[index];
+  // おすすめポケモン登録
+  async function rcmPokemon({ index }) {
+    const pokeName = pokeNames[index];
+    const pokeImage = pokeImages[index];
+    const pokeType = pokeTypes[index];
 
-      // ファイル名を画像のパスから取得
-      const fileName = pokeImage.split('/').pop();
+    // ファイル名を画像のパスから取得
+    const fileName = pokeImage.split('/').pop();
 
-      // 画像を fetch して Blob データに変換
-      const response = await fetch(pokeImage);
-      const imageBlob = await response.blob();
-      const imageFile = new File([imageBlob], fileName, { type: imageBlob.type });
+    // 画像を fetch して Blob データに変換
+    const response = await fetch(pokeImage);
+    const imageBlob = await response.blob();
+    const imageFile = new File([imageBlob], fileName, { type: imageBlob.type });
 
-      // Note登録（DynamoDB）
-       const { data: newNote } = await client.models.Note.create({
+    // Note登録（DynamoDB）
+    const { data: newNote } = await client.models.Note.create({
       name: pokeName,
       description: pokeType,
       image: imageFile.name,
     });
 
-      // 画像ファイルを S3 に保存
+    // 画像ファイルを S3 に保存
+    try {
       await uploadData({
         path: ({ identityId }) => `media/${identityId}/${imageFile.name}`,
         data: imageFile,
       }).result;
-
+      console.log("Image uploaded successfully");
       fetchNotes(); // 最新データを取得
-
+    } catch (error) {
+      console.error("Error uploading image:", error);
     }
+  }
 
   /////JSX（画面の表示）//////////////////////////////////////////////////////////////////////////////////
   return (
@@ -171,44 +188,44 @@ export default function App() {
               alt={pokeNames[currentIndex]} // 画像に名前を追加
             />
             {!isShuffling && (
-            <View>
-              <p>ポケモンの名前：{pokeNames[currentIndex]}</p>
-              <p>ポケモンのタイプ：{pokeTypes[currentIndex]}</p> 
-          
-              <Button variation="primary" onClick={() => rcmPokemon({index:currentIndex})}>
-                このポケモンを登録する
-              </Button>
-            </View>)}
+              <View>
+                <p>ポケモンの名前：{pokeNames[currentIndex]}</p>
+                <p>ポケモンのタイプ：{pokeTypes[currentIndex]}</p>
+
+                <Button variant="contained" size="small" onClick={() => rcmPokemon({ index: currentIndex })}>
+                  このポケモンを登録する
+                </Button>
+              </View>)}
 
             <h2>ポケモンを登録する</h2>
             <View as="form" margin="0.5rem 0" onSubmit={createNote}>
               <Flex direction="column" justifyContent="center" gap="1.5rem" padding="0.5rem">
                 <TextField
-                  name="name"
                   placeholder="ポケモンの名前"
                   label="ポケモンの名前"
                   labelHidden
                   variation="quiet"
                   required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
                 <TextField
-                  name="description"
                   placeholder="ポケモンのタイプ"
                   label="ポケモンのタイプ"
                   labelHidden
                   variation="quiet"
                   required
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
-                <View
-                  name="image"
-                  as="input"
+                <input
                   type="file"
-                  alignSelf={"end"}
-                  accept="image/png, image/jpeg"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={(e) => setImageFile(e.target.files[0])}
+                  required
                 />
-                <Button type="submit" variation="primary">
-                  登録
-                </Button>
+                <Button variant="contained" size="large" type="submit">登録</Button>
               </Flex>
             </View>
           </div>
@@ -242,12 +259,15 @@ export default function App() {
                     src={note.image}
                     alt={`visual aid for ${note.name}`}
                     style={{ width: 150 }}
-                    onError={() => console.error("Image failed to load")}
+                    onError={() => console.error(`Failed to load image for ${note.name}`)}
                   />
                 )}
-                <Button variation="destructive" onClick={() => deleteNote(note)}>
-                  削除する
-                </Button>
+
+                <Stack direction="row" spacing={2}>
+                  <Button variant="outlined" startIcon={<DeleteIcon />} onClick={() => deleteNote(note)}>
+                    削除
+                  </Button>
+                </Stack>
               </Flex>
             ))}
           </Grid>
